@@ -1,0 +1,25 @@
+{
+  "domain_id": "EH",
+  "domain_name": "Environmental Hazard",
+  "version": "1.0",
+  "hazard_keywords": ["wave", "wind", "sea state", "metocean", "weather", "current", "storm", "swell"],
+  "linguistic_variables": {
+    "wave_height":    {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "wind_speed":     {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "current_speed":  {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "risk_score":     {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]}
+  },
+  "inference_templates": [
+    {"id": "T_EH_1", "conditions": {"wave_height": "high",   "wind_speed": "high"},    "output": "high",   "weight": 0.88},
+    {"id": "T_EH_2", "conditions": {"wave_height": "high",   "current_speed": "medium"}, "output": "high", "weight": 0.78},
+    {"id": "T_EH_3", "conditions": {"wave_height": "medium", "wind_speed": "medium"},  "output": "medium", "weight": 0.72},
+    {"id": "T_EH_4", "conditions": {"wave_height": "low",    "wind_speed": "low"},     "output": "low",    "weight": 0.90}
+  ],
+  "routing_confidence": 0.85,
+  "benchmark": {
+    "expert_agreement_rate": 0.87,
+    "mean_deviation": 0.13,
+    "version": 1,
+    "approval_date": "2024-01-15"
+  }
+}

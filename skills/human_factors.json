@@ -1,0 +1,25 @@
+{
+  "domain_id": "HF",
+  "domain_name": "Human Factors",
+  "version": "1.0",
+  "hazard_keywords": ["operator", "training", "procedure", "compliance", "fatigue", "error", "human reliability", "crew"],
+  "linguistic_variables": {
+    "training_adequacy":      {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "procedural_compliance":  {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "operator_fatigue":       {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "risk_score":             {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]}
+  },
+  "inference_templates": [
+    {"id": "T_HF_1", "conditions": {"operator_fatigue": "high",  "procedural_compliance": "low"},  "output": "high",   "weight": 0.91},
+    {"id": "T_HF_2", "conditions": {"training_adequacy": "low",  "procedural_compliance": "low"},  "output": "high",   "weight": 0.87},
+    {"id": "T_HF_3", "conditions": {"training_adequacy": "medium","operator_fatigue": "medium"},   "output": "medium", "weight": 0.73},
+    {"id": "T_HF_4", "conditions": {"training_adequacy": "high", "procedural_compliance": "high"}, "output": "low",    "weight": 0.89}
+  ],
+  "routing_confidence": 0.91,
+  "benchmark": {
+    "expert_agreement_rate": 0.91,
+    "mean_deviation": 0.09,
+    "version": 1,
+    "approval_date": "2024-01-15"
+  }
+}

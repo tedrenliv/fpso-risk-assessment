@@ -1,0 +1,25 @@
+{
+  "domain_id": "MM",
+  "domain_name": "Maintenance Management",
+  "version": "1.0",
+  "hazard_keywords": ["maintenance", "overdue", "work order", "inspection interval", "degradation", "schedule"],
+  "linguistic_variables": {
+    "maintenance_frequency": {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "equipment_condition":   {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "overdue_tasks":         {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "risk_score":            {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]}
+  },
+  "inference_templates": [
+    {"id": "T_MM_1", "conditions": {"overdue_tasks": "high",   "maintenance_frequency": "low"},    "output": "high",   "weight": 0.92},
+    {"id": "T_MM_2", "conditions": {"equipment_condition": "low", "overdue_tasks": "medium"},       "output": "high",   "weight": 0.85},
+    {"id": "T_MM_3", "conditions": {"maintenance_frequency": "medium", "equipment_condition": "medium"}, "output": "medium", "weight": 0.70},
+    {"id": "T_MM_4", "conditions": {"maintenance_frequency": "high",  "equipment_condition": "high"}, "output": "low",    "weight": 0.88}
+  ],
+  "routing_confidence": 0.88,
+  "benchmark": {
+    "expert_agreement_rate": 0.89,
+    "mean_deviation": 0.11,
+    "version": 1,
+    "approval_date": "2024-01-15"
+  }
+}

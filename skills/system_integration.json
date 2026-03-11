@@ -1,0 +1,25 @@
+{
+  "domain_id": "SysI",
+  "domain_name": "System Integration",
+  "version": "1.0",
+  "hazard_keywords": ["dynamic positioning", "DP", "PRS", "DGPS", "control system", "sensor", "redundancy", "software fault", "position reference"],
+  "linguistic_variables": {
+    "redundancy_level":    {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "sensor_reliability":  {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "integration_complexity": {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "risk_score":          {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]}
+  },
+  "inference_templates": [
+    {"id": "T_SysI_1", "conditions": {"redundancy_level": "low",   "sensor_reliability": "low"},    "output": "high",   "weight": 0.95},
+    {"id": "T_SysI_2", "conditions": {"integration_complexity": "high", "redundancy_level": "low"}, "output": "high",   "weight": 0.88},
+    {"id": "T_SysI_3", "conditions": {"sensor_reliability": "medium", "redundancy_level": "medium"}, "output": "medium", "weight": 0.74},
+    {"id": "T_SysI_4", "conditions": {"redundancy_level": "high",  "sensor_reliability": "high"},   "output": "low",    "weight": 0.91}
+  ],
+  "routing_confidence": 0.95,
+  "benchmark": {
+    "expert_agreement_rate": 0.95,
+    "mean_deviation": 0.05,
+    "version": 1,
+    "approval_date": "2024-01-15"
+  }
+}

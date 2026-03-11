@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPSO Multi-Agent Risk Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-0: #060709;
+            --bg-1: #0c0e12;
+            --bg-2: #121620;
+            --bg-3: #18202e;
+            --border: #1b2535;
+            --border-bright: #263548;
+
+            --amber: #e09a1c;
+            --amber-dim: #6e4c0c;
+            --amber-glow: rgba(224, 154, 28, 0.12);
+            --amber-bright: #f0b030;
+
+            --steel: #3a6278;
+            --steel-dim: #1c3040;
+
+            --text-0: #dde2ec;
+            --text-1: #96a2b8;
+            --text-2: #505c72;
+
+            --risk-low: #22c55e;
+            --risk-low-dim: rgba(34, 197, 94, 0.12);
+            --risk-med: #f59e0b;
+            --risk-med-dim: rgba(245, 158, 11, 0.12);
+            --risk-high: #ef4444;
+            --risk-high-dim: rgba(239, 68, 68, 0.12);
+
+            --font-display: 'Bebas Neue', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+            --font-body: 'IBM Plex Sans', sans-serif;
+            --r: 3px;
+            --r-lg: 6px;
+        }
+
+        html, body { height: 100%; background: var(--bg-0); color: var(--text-0); font-family: var(--font-body); font-size: 13px; overflow: hidden; }
+
+        /* Grain overlay */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 9999; opacity: 0.4;
+        }
+
+        /* === LAYOUT === */
+        .app {
+            display: grid;
+            grid-template-rows: 52px 1fr auto;
+            grid-template-columns: 290px 1fr 280px;
+            height: 100vh;
+        }
+
+        /* === HEADER === */
+        header {
+            grid-column: 1 / -1;
+            background: var(--bg-1);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 18px; gap: 16px;
+            position: relative;
+        }
+        header::after {
+            content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--amber-dim) 20%, var(--amber) 50%, var(--amber-dim) 80%, transparent 100%);
+        }
+
+        .logo {
+            font-family: var(--font-display); font-size: 20px;
+            letter-spacing: 3px; color: var(--amber); line-height: 1; flex-shrink: 0;
+        }
+        .logo span {
+            display: block; font-family: var(--font-mono); font-size: 9px;
+            letter-spacing: 4px; color: var(--text-2); margin-top: 1px;
+        }
+
+        .hdiv { width: 1px; height: 26px; background: var(--border-bright); flex-shrink: 0; }
+
+        .orch-status { display: flex; align-items: center; gap: 10px; }
+        .status-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); letter-spacing: 1.5px; text-transform: uppercase; }
+        .status-badge {
+            font-family: var(--font-mono); font-size: 10px; padding: 3px 10px;
+            border-radius: var(--r); border: 1px solid; letter-spacing: 0.5px;
+        }
+        .status-badge.idle    { color: var(--text-2); border-color: var(--border-bright); background: transparent; }
+        .status-badge.running { color: var(--amber); border-color: var(--amber-dim); background: var(--amber-glow); animation: pulse-fade 1.4s ease-in-out infinite; }
+        .status-badge.waiting { color: #60a5fa; border-color: rgba(96,165,250,.3); background: rgba(96,165,250,.08); animation: pulse-fade 2s ease-in-out infinite; }
+        .status-badge.complete { color: var(--risk-low); border-color: rgba(34,197,94,.3); background: var(--risk-low-dim); }
+
+        @keyframes pulse-fade { 0%,100%{opacity:1} 50%{opacity:.55} }
+
+        .header-meta { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+        .meta-item .label { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); letter-spacing: 1.5px; text-transform: uppercase; }
+        .meta-item .value { font-family: var(--font-mono); font-size: 11px; color: var(--text-1); }
+
+        .btn-ghost {
+            padding: 5px 12px; border-radius: var(--r);
+            border: 1px solid var(--border-bright); background: transparent;
+            color: var(--text-2); font-family: var(--font-mono); font-size: 9px;
+            cursor: pointer; transition: all .15s; letter-spacing: .5px;
+        }
+        .btn-ghost:hover { border-color: var(--amber-dim); color: var(--amber); }
+
+        /* === PANEL COMMON === */
+        .panel-header {
+            padding: 12px 16px 10px;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display); font-size: 12px;
+            letter-spacing: 2px; color: var(--text-1);
+            display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+        }
+        .panel-header::before { content: ''; width: 3px; height: 12px; border-radius: 1px; }
+        .ph-amber::before  { background: var(--amber); }
+        .ph-steel::before  { background: var(--steel); }
+        .ph-blue::before   { background: #4a7aaa; }
+
+        /* === LEFT PANEL === */
+        .left-panel {
+            background: var(--bg-1); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .query-section { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .field-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); letter-spacing: 1.5px; text-transform: uppercase; }
+
+        .query-textarea {
+            width: 100%; height: 104px; background: var(--bg-2);
+            border: 1px solid var(--border); border-radius: var(--r);
+            padding: 9px; color: var(--text-0); font-family: var(--font-mono);
+            font-size: 11px; line-height: 1.55; resize: none; outline: none;
+            transition: border-color .2s, background .2s;
+        }
+        .query-textarea:focus { border-color: var(--amber-dim); background: var(--bg-3); }
+        .query-textarea::placeholder { color: var(--text-2); }
+
+        .domain-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chip {
+            font-family: var(--font-mono); font-size: 9px; padding: 3px 9px;
+            border-radius: var(--r); border: 1px solid var(--border-bright);
+            background: transparent; color: var(--text-2); cursor: pointer;
+            transition: all .15s; letter-spacing: .5px;
+        }
+        .chip:hover { border-color: var(--amber-dim); color: var(--amber); }
+        .chip.on { border-color: var(--amber); color: var(--amber); background: var(--amber-glow); }
+
+        .run-btn {
+            width: 100%; padding: 11px;
+            background: var(--amber); border: none; border-radius: var(--r);
+            color: var(--bg-0); font-family: var(--font-display); font-size: 15px;
+            letter-spacing: 3px; cursor: pointer; transition: all .2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .run-btn:hover:not(:disabled) { background: var(--amber-bright); transform: translateY(-1px); box-shadow: 0 4px 18px rgba(224,154,28,.35); }
+        .run-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .pdivider { height: 1px; background: var(--border); flex-shrink: 0; }
+
+        /* Log */
+        .log-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .log-scroll {
+            flex: 1; overflow-y: auto; padding: 8px 14px;
+            display: flex; flex-direction: column; gap: 2px; min-height: 0;
+        }
+        .log-scroll::-webkit-scrollbar { width: 3px; }
+        .log-scroll::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+        .le { font-family: var(--font-mono); font-size: 10px; line-height: 1.6; display: flex; gap: 7px; }
+        .le .lt { color: var(--steel); flex-shrink: 0; width: 50px; }
+        .le .lk { flex-shrink: 0; width: 68px; text-align: right; }
+        .le .lm { color: var(--text-1); }
+        .le.info  .lk { color: var(--steel); }
+        .le.ok    .lk { color: var(--risk-low); }
+        .le.warn  .lk { color: var(--amber); }
+        .le.hot   .lk { color: var(--amber-bright); }
+        .le.hot   .lm { color: var(--text-0); }
+
+        /* === CENTER PANEL === */
+        .center-panel { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0); }
+        .pipe-bar {
+            padding: 10px 18px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .pipe-title {
+            font-family: var(--font-display); font-size: 12px; letter-spacing: 2px;
+            color: var(--text-1); display: flex; align-items: center; gap: 8px;
+        }
+        .pipe-title::before { content: ''; width: 3px; height: 12px; background: var(--steel); border-radius: 1px; }
+        .pipe-elapsed { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
+        .pipe-elapsed em { font-style: normal; color: var(--amber); }
+
+        .pipe-svg-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden; }
+        .pipe-svg-wrap svg { max-height: 100%; max-width: 100%; }
+
+        /* SVG node states */
+        .pnode rect { transition: fill .3s, stroke .3s, filter .3s; }
+        .pnode text { transition: fill .3s; }
+
+        .s-idle   rect { fill: #10141c; stroke: #1b2535; }
+        .s-idle   text { fill: #424e64; }
+
+        .s-active rect { fill: rgba(224,154,28,.07); stroke: #e09a1c; filter: drop-shadow(0 0 7px rgba(224,154,28,.28)); }
+        .s-active text { fill: #f0b830; }
+
+        .s-done   rect { fill: rgba(34,197,94,.05); stroke: rgba(34,197,94,.35); }
+        .s-done   text { fill: #4ade80; }
+
+        .s-wait   rect { fill: rgba(96,165,250,.07); stroke: rgba(96,165,250,.45); filter: drop-shadow(0 0 7px rgba(96,165,250,.2)); }
+        .s-wait   text { fill: #93c5fd; }
+
+        .fline { fill: none; stroke: #1b2535; stroke-width: 1.5; }
+        .fanim { fill: none; stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linecap: round; }
+        @keyframes flow { to { stroke-dashoffset: -18; } }
+        .fanim.on { animation: flow .55s linear infinite; }
+
+        /* === RIGHT PANEL === */
+        .right-panel {
+            background: var(--bg-1); border-left: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .radar-wrap { display: flex; justify-content: center; padding: 8px 0 4px; flex-shrink: 0; }
+
+        .rank-scroll { flex: 1; overflow-y: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+        .rank-scroll::-webkit-scrollbar { width: 3px; }
+        .rank-scroll::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+        .ritem { display: flex; flex-direction: column; gap: 4px; opacity: 0; transform: translateX(8px); transition: opacity .4s, transform .4s; }
+        .ritem.in { opacity: 1; transform: translateX(0); }
+        .ritem-head { display: flex; justify-content: space-between; align-items: baseline; }
+        .rdom { font-family: var(--font-mono); font-size: 11px; color: var(--text-0); font-weight: 500; }
+        .rscore { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+        .rscore.hi  { color: var(--risk-high); }
+        .rscore.med { color: var(--risk-med); }
+        .rscore.lo  { color: var(--risk-low); }
+        .rbar-bg { height: 2px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
+        .rbar-fill { height: 100%; border-radius: 2px; transition: width .85s cubic-bezier(.4,0,.2,1); width: 0; }
+        .rbar-fill.hi  { background: var(--risk-high); }
+        .rbar-fill.med { background: var(--risk-med); }
+        .rbar-fill.lo  { background: var(--risk-low); }
+        .rbel { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); }
+
+        /* Traceability */
+        .trace-section { padding: 10px 14px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+        .trace-inner { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); display: flex; flex-direction: column; gap: 3px; }
+        .trace-inner .th { color: var(--text-1); }
+
+        /* === HITL BANNER === */
+        .hitl-banner {
+            grid-column: 1 / -1;
+            background: var(--bg-2);
+            border-top: 1px solid rgba(96,165,250,.25);
+            padding: 12px 18px;
+            display: none; align-items: center; gap: 16px;
+        }
+        .hitl-banner.show { display: flex; }
+        .hitl-icon {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.28);
+            display: flex; align-items: center; justify-content: center;
+            color: #60a5fa; flex-shrink: 0; animation: ring 2s ease-in-out infinite;
+        }
+        @keyframes ring { 0%,100%{box-shadow:0 0 0 0 rgba(96,165,250,.3)} 50%{box-shadow:0 0 0 7px rgba(96,165,250,0)} }
+        .hitl-body { flex: 1; }
+        .hitl-title { font-family: var(--font-display); font-size: 13px; letter-spacing: 2px; color: #60a5fa; margin-bottom: 2px; }
+        .hitl-desc  { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
+        .hitl-btns  { display: flex; gap: 7px; }
+        .hbtn {
+            padding: 7px 14px; border-radius: var(--r); border: 1px solid;
+            font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+            transition: all .15s; letter-spacing: .5px;
+        }
+        .hbtn.approve { color: var(--risk-low); border-color: rgba(34,197,94,.28); background: var(--risk-low-dim); }
+        .hbtn.approve:hover { border-color: var(--risk-low); background: rgba(34,197,94,.18); }
+        .hbtn.reject  { color: var(--risk-high); border-color: rgba(239,68,68,.28); background: var(--risk-high-dim); }
+        .hbtn.reject:hover  { border-color: var(--risk-high); background: rgba(239,68,68,.18); }
+        .hbtn.modify  { color: var(--amber); border-color: var(--amber-dim); background: var(--amber-glow); }
+        .hbtn.modify:hover  { border-color: var(--amber); background: rgba(224,154,28,.18); }
+        .hbtn.skip    { color: var(--text-2); border-color: var(--border-bright); background: transparent; }
+        .hbtn.skip:hover    { color: var(--text-1); border-color: var(--text-2); }
+
+        /* === SKILLS DRAWER === */
+        .drawer {
+            position: fixed; right: 0; top: 52px; bottom: 0; width: 320px;
+            background: var(--bg-1); border-left: 1px solid var(--border);
+            transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1);
+            z-index: 200; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-head {
+            padding: 12px 14px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .drawer-title { font-family: var(--font-display); font-size: 13px; letter-spacing: 2px; color: var(--amber); }
+        .drawer-close {
+            width: 24px; height: 24px; border-radius: var(--r);
+            border: 1px solid var(--border-bright); background: transparent;
+            color: var(--text-2); cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .15s; line-height: 1;
+        }
+        .drawer-close:hover { color: var(--text-0); border-color: var(--text-2); }
+        .drawer-scroll { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+        .skill-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 12px; }
+        .sk-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .sk-name { font-family: var(--font-mono); font-size: 10px; color: var(--text-0); font-weight: 500; }
+        .sk-ver  { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); padding: 2px 6px; background: var(--bg-3); border-radius: var(--r); }
+        .sk-conf-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .sk-conf-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-2); }
+        .sk-conf-val   { font-family: var(--font-mono); font-size: 10px; color: var(--amber); }
+        .sk-bar-bg  { height: 2px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
+        .sk-bar-fill{ height: 100%; background: var(--amber); border-radius: 2px; }
+        .sk-meta { margin-top: 7px; font-family: var(--font-mono); font-size: 9px; color: var(--text-2); }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+
+    <!-- ═══════════════════ HEADER ═══════════════════ -->
+    <header>
+        <div class="logo">FPSO·RA<span>MULTI-AGENT RISK ANALYZER</span></div>
+        <div class="hdiv"></div>
+        <div class="orch-status">
+            <span class="status-label">ORCHESTRATOR</span>
+            <span class="status-badge idle" id="orchBadge">IDLE</span>
+        </div>
+        <div class="header-meta">
+            <div class="meta-item">
+                <div class="label">MODEL</div>
+                <div class="value">claude-sonnet-4-6</div>
+            </div>
+            <div class="hdiv"></div>
+            <div class="meta-item">
+                <div class="label">ELAPSED</div>
+                <div class="value" id="elapsedVal">—</div>
+            </div>
+            <div class="hdiv"></div>
+            <div class="meta-item">
+                <div class="label">AGENTS</div>
+                <div class="value">9</div>
+            </div>
+            <div class="hdiv"></div>
+            <button class="btn-ghost" onclick="toggleDrawer()">SKILLS INSPECTOR</button>
+        </div>
+    </header>
+
+    <!-- ═══════════════════ LEFT PANEL ═══════════════════ -->
+    <aside class="left-panel">
+        <div class="panel-header ph-amber">QUERY INPUT</div>
+
+        <div class="query-section">
+            <div class="field-label">RISK QUERY</div>
+            <textarea class="query-textarea" id="queryBox"
+                placeholder="e.g. Assess CPP blade corrosion risk during storm conditions..."
+            >Assess CPP blade corrosion risk during storm conditions with reduced maintenance crew availability</textarea>
+
+            <div class="field-label">DOMAIN FILTER</div>
+            <div class="domain-chips">
+                <div class="chip on" onclick="this.classList.toggle('on')">SI</div>
+                <div class="chip on" onclick="this.classList.toggle('on')">MM</div>
+                <div class="chip on" onclick="this.classList.toggle('on')">EH</div>
+                <div class="chip"    onclick="this.classList.toggle('on')">HF</div>
+                <div class="chip"    onclick="this.classList.toggle('on')">SYSI</div>
+            </div>
+
+            <button class="run-btn" id="runBtn" onclick="runPipeline()">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5l10 5.5-10 5.5z"/></svg>
+                RUN ANALYSIS
+            </button>
+        </div>
+
+        <div class="pdivider"></div>
+        <div class="panel-header ph-steel">SYSTEM LOG</div>
+        <div class="log-section">
+            <div class="log-scroll" id="logScroll">
+                <div class="le info"><span class="lt">00:00.0</span><span class="lk">[SYS]</span><span class="lm">ChromaDB connected. 5 skill agents loaded.</span></div>
+                <div class="le info"><span class="lt">00:00.1</span><span class="lk">[SYS]</span><span class="lm">Orchestrator ready. Awaiting query.</span></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════ CENTER PANEL ═══════════════════ -->
+    <main class="center-panel">
+        <div class="pipe-bar">
+            <div class="pipe-title">PIPELINE FLOW</div>
+            <div class="pipe-elapsed" id="pipeMsg">Awaiting query</div>
+        </div>
+
+        <div class="pipe-svg-wrap">
+            <svg id="psvg" viewBox="0 0 560 630" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+
+                <!-- ── STATIC LINES ── -->
+                <g>
+                    <!-- Orch → RAG -->
+                    <line x1="280" y1="64" x2="280" y2="100" class="fline"/>
+                    <!-- RAG → Router -->
+                    <line x1="280" y1="136" x2="280" y2="172" class="fline"/>
+                    <!-- Router fan-out horizontal bar -->
+                    <line x1="76"  y1="226" x2="484" y2="226" class="fline"/>
+                    <!-- Router → bar -->
+                    <line x1="280" y1="208" x2="280" y2="226" class="fline"/>
+                    <!-- bar → L4 verticals -->
+                    <line x1="76"  y1="226" x2="76"  y2="260" class="fline"/>
+                    <line x1="166" y1="226" x2="166" y2="260" class="fline"/>
+                    <line x1="256" y1="226" x2="256" y2="260" class="fline"/>
+                    <line x1="346" y1="226" x2="346" y2="260" class="fline"/>
+                    <line x1="484" y1="226" x2="484" y2="260" class="fline"/>
+                    <!-- L4 → merge bar -->
+                    <line x1="76"  y1="296" x2="76"  y2="350" class="fline"/>
+                    <line x1="166" y1="296" x2="166" y2="350" class="fline"/>
+                    <line x1="256" y1="296" x2="256" y2="350" class="fline"/>
+                    <line x1="346" y1="296" x2="346" y2="350" class="fline"/>
+                    <line x1="484" y1="296" x2="484" y2="350" class="fline"/>
+                    <line x1="76"  y1="350" x2="484" y2="350" class="fline"/>
+                    <!-- bar → Synthesis -->
+                    <line x1="280" y1="350" x2="280" y2="368" class="fline"/>
+                    <!-- Synth → Validator -->
+                    <line x1="280" y1="404" x2="280" y2="440" class="fline"/>
+                    <!-- Validator → Output -->
+                    <line x1="280" y1="476" x2="280" y2="512" class="fline"/>
+                </g>
+
+                <!-- ── ANIMATED FLOW LINES ── -->
+                <g>
+                    <line id="fa-orch-rag"    x1="280" y1="64"  x2="280" y2="100" class="fanim" stroke="#e09a1c"/>
+                    <line id="fa-rag-rtr"     x1="280" y1="136" x2="280" y2="172" class="fanim" stroke="#e09a1c"/>
+                    <!-- router to each L4 -->
+                    <polyline id="fa-rtr-si"   points="280,208 280,226 76,226 76,260"  class="fanim" fill="none" stroke="#e09a1c"/>
+                    <polyline id="fa-rtr-mm"   points="280,208 280,226 166,226 166,260" class="fanim" fill="none" stroke="#e09a1c"/>
+                    <polyline id="fa-rtr-eh"   points="280,208 280,226 256,226 256,260" class="fanim" fill="none" stroke="#e09a1c"/>
+                    <polyline id="fa-rtr-hf"   points="280,208 280,226 346,226 346,260" class="fanim" fill="none" stroke="#e09a1c"/>
+                    <polyline id="fa-rtr-sysi" points="280,208 280,226 484,226 484,260" class="fanim" fill="none" stroke="#e09a1c"/>
+                    <!-- each L4 to synthesis -->
+                    <polyline id="fa-si-syn"   points="76,296 76,350 280,350 280,368"   class="fanim" fill="none" stroke="#22c55e"/>
+                    <polyline id="fa-mm-syn"   points="166,296 166,350 280,350 280,368" class="fanim" fill="none" stroke="#22c55e"/>
+                    <polyline id="fa-eh-syn"   points="256,296 256,350 280,350 280,368" class="fanim" fill="none" stroke="#22c55e"/>
+                    <polyline id="fa-hf-syn"   points="346,296 346,350 280,350 280,368" class="fanim" fill="none" stroke="#22c55e"/>
+                    <polyline id="fa-sysi-syn" points="484,296 484,350 280,350 280,368" class="fanim" fill="none" stroke="#22c55e"/>
+                    <line id="fa-syn-val"  x1="280" y1="404" x2="280" y2="440" class="fanim" stroke="#22c55e"/>
+                    <line id="fa-val-out"  x1="280" y1="476" x2="280" y2="512" class="fanim" stroke="#60a5fa"/>
+                </g>
+
+                <!-- ── NODES ── -->
+
+                <!-- Orchestrator -->
+                <g class="pnode s-idle" id="node-orchestrator">
+                    <rect x="175" y="26" width="210" height="38" rx="3"/>
+                    <text x="280" y="41"  text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="12" letter-spacing="2.5">ORCHESTRATOR</text>
+                    <text x="280" y="57"  text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">run_pipeline() · asyncio</text>
+                </g>
+
+                <!-- L2 RAG -->
+                <g class="pnode s-idle" id="node-rag">
+                    <rect x="190" y="100" width="180" height="36" rx="3"/>
+                    <text x="280" y="114" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">L2 · RAG AGENT</text>
+                    <text x="280" y="129" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">ChromaDB retrieval</text>
+                </g>
+
+                <!-- L3 Skill Router -->
+                <g class="pnode s-idle" id="node-router">
+                    <rect x="190" y="172" width="180" height="36" rx="3"/>
+                    <text x="280" y="186" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">L3 · SKILL ROUTER</text>
+                    <text x="280" y="201" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">keyword filter + LLM</text>
+                </g>
+
+                <!-- L4 parallel label -->
+                <text x="280" y="247" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#263548">── L4 PARALLEL ──</text>
+
+                <!-- SI -->
+                <g class="pnode s-idle" id="node-si">
+                    <rect x="36"  y="260" width="80" height="36" rx="3"/>
+                    <text x="76"  y="273" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">SI</text>
+                    <text x="76"  y="288" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" opacity=".55">Structural</text>
+                </g>
+                <!-- MM -->
+                <g class="pnode s-idle" id="node-mm">
+                    <rect x="126" y="260" width="80" height="36" rx="3"/>
+                    <text x="166" y="273" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">MM</text>
+                    <text x="166" y="288" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" opacity=".55">Maintenance</text>
+                </g>
+                <!-- EH -->
+                <g class="pnode s-idle" id="node-eh">
+                    <rect x="216" y="260" width="80" height="36" rx="3"/>
+                    <text x="256" y="273" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">EH</text>
+                    <text x="256" y="288" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" opacity=".55">Environmental</text>
+                </g>
+                <!-- HF -->
+                <g class="pnode s-idle" id="node-hf">
+                    <rect x="306" y="260" width="80" height="36" rx="3"/>
+                    <text x="346" y="273" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">HF</text>
+                    <text x="346" y="288" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" opacity=".55">Human Factors</text>
+                </g>
+                <!-- SysI -->
+                <g class="pnode s-idle" id="node-sysi">
+                    <rect x="444" y="260" width="80" height="36" rx="3"/>
+                    <text x="484" y="273" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="1.5">SYSI</text>
+                    <text x="484" y="288" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" opacity=".55">Sys. Integ.</text>
+                </g>
+
+                <!-- L5 Synthesis -->
+                <g class="pnode s-idle" id="node-synthesis">
+                    <rect x="190" y="368" width="180" height="36" rx="3"/>
+                    <text x="280" y="382" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">L5 · SYNTHESIS</text>
+                    <text x="280" y="397" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">Dempster-Shafer BPA</text>
+                </g>
+
+                <!-- Validator -->
+                <g class="pnode s-idle" id="node-validator">
+                    <rect x="190" y="440" width="180" height="36" rx="3"/>
+                    <text x="280" y="454" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">VALIDATOR · HITL</text>
+                    <text x="280" y="469" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">Expert checkpoint</text>
+                </g>
+
+                <!-- L6 Output -->
+                <g class="pnode s-idle" id="node-output">
+                    <rect x="190" y="512" width="180" height="36" rx="3"/>
+                    <text x="280" y="526" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="11" letter-spacing="2">L6 · OUTPUT AGENT</text>
+                    <text x="280" y="541" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" opacity=".55">risk_rankings · traceability</text>
+                </g>
+
+            </svg>
+        </div>
+    </main>
+
+    <!-- ═══════════════════ RIGHT PANEL ═══════════════════ -->
+    <aside class="right-panel">
+        <div class="panel-header ph-amber">RISK PROFILE</div>
+        <div class="radar-wrap">
+            <svg id="radarSvg" viewBox="0 0 210 210" width="190" height="190">
+                <g id="rGrid"></g>
+                <g id="rAxes"></g>
+                <polygon id="rFill" points="105,105 105,105 105,105 105,105 105,105"
+                    fill="rgba(224,154,28,.12)" stroke="rgba(224,154,28,.55)" stroke-width="1.5"
+                    style="transition: points .6s ease"/>
+                <g id="rDots"></g>
+                <g id="rLabels"></g>
+            </svg>
+        </div>
+
+        <div class="panel-header ph-steel">RISK RANKINGS</div>
+        <div class="rank-scroll" id="rankScroll">
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-2);text-align:center;padding:10px 0">
+                Run analysis to see results
+            </div>
+        </div>
+
+        <div class="trace-section">
+            <div class="panel-header ph-blue" style="padding:0 0 8px;border:none;font-size:10px;margin-bottom:4px;">TRACEABILITY</div>
+            <div class="trace-inner" id="traceOut">—</div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════ HITL BANNER ═══════════════════ -->
+    <div class="hitl-banner" id="hitlBanner">
+        <div class="hitl-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        </div>
+        <div class="hitl-body">
+            <div class="hitl-title">EXPERT VALIDATION CHECKPOINT</div>
+            <div class="hitl-desc">Validator has completed report generation. Pipeline paused — awaiting expert review before L6 output.</div>
+        </div>
+        <div class="hitl-btns">
+            <button class="hbtn approve" onclick="hitl('approve')">APPROVE</button>
+            <button class="hbtn reject"  onclick="hitl('reject')">REJECT</button>
+            <button class="hbtn modify"  onclick="hitl('modify')">MODIFY</button>
+            <button class="hbtn skip"    onclick="hitl('skip')">SKIP</button>
+        </div>
+    </div>
+
+</div><!-- .app -->
+
+<!-- ═══════════════════ SKILLS DRAWER ═══════════════════ -->
+<div class="drawer" id="drawer">
+    <div class="drawer-head">
+        <div class="drawer-title">SKILLS INSPECTOR</div>
+        <button class="drawer-close" onclick="toggleDrawer()">×</button>
+    </div>
+    <div class="drawer-scroll" id="drawerScroll"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════
+const DOMAINS = ['SI','MM','EH','HF','SysI'];
+const DOM_LABELS = { SI:'Structural Integrity', MM:'Maintenance Mgmt', EH:'Environmental Hazard', HF:'Human Factors', SysI:'System Integration' };
+
+// Map log tags → node IDs for live pipeline visualization
+const _TAG_NODE = {
+    '[L2]':        {activate:'rag',        done:'orchestrator'},
+    '[L3]':        {activate:'router',     done:'rag'},
+    '[L4]':        {activate:null,         done:'router'},
+    '[L5]':        {activate:'synthesis',  done:null},
+    '[Validator]': {activate:'validator',  done:'synthesis'},
+    '[L6]':        {activate:'output',     done:'validator'},
+};
+const _tagsSeen = new Set();
+
+function updateNodeFromLog(tag) {
+    if (_tagsSeen.has(tag)) return;
+    _tagsSeen.add(tag);
+    const entry = _TAG_NODE[tag];
+    if (!entry) return;
+    if (entry.done)     nstate(entry.done,     'done');
+    if (entry.activate) nstate(entry.activate, 'active');
+    if (tag === '[L4]') {
+        ['si','mm','eh','hf','sysi'].forEach(n => nstate(n, 'active'));
+        ['fa-rtr-si','fa-rtr-mm','fa-rtr-eh','fa-rtr-hf','fa-rtr-sysi'].forEach(f => fstate(f, true));
+    }
+}
+
+
+const SKILLS_META = [
+    { id:'SI',   file:'structural_integrity.json',    conf:.87, ver:4, tpl:12 },
+    { id:'MM',   file:'maintenance_management.json',  conf:.82, ver:3, tpl:9  },
+    { id:'EH',   file:'environmental_hazard.json',    conf:.79, ver:5, tpl:11 },
+    { id:'HF',   file:'human_factors.json',           conf:.71, ver:2, tpl:7  },
+    { id:'SysI', file:'system_integration.json',      conf:.76, ver:3, tpl:10 }
+];
+
+// ═══════════════════════════════════════
+//  RADAR CHART
+// ═══════════════════════════════════════
+const CX=105, CY=105, R=74;
+const ANGLES = DOMAINS.map((_,i) => (i/DOMAINS.length)*2*Math.PI - Math.PI/2);
+
+function initRadar(){
+    const grid=document.getElementById('rGrid');
+    const axes=document.getElementById('rAxes');
+    const labs=document.getElementById('rLabels');
+    [.25,.5,.75,1].forEach(f=>{
+        const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('cx',CX); c.setAttribute('cy',CY);
+        c.setAttribute('r',R*f); c.setAttribute('fill','none');
+        c.setAttribute('stroke','#1b2535'); c.setAttribute('stroke-width','1');
+        grid.appendChild(c);
+    });
+    ANGLES.forEach((a,i)=>{
+        const x=CX+R*Math.cos(a), y=CY+R*Math.sin(a);
+        const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+        ln.setAttribute('x1',CX); ln.setAttribute('y1',CY);
+        ln.setAttribute('x2',x);  ln.setAttribute('y2',y);
+        ln.setAttribute('stroke','#1b2535'); ln.setAttribute('stroke-width','1');
+        axes.appendChild(ln);
+        const lx=CX+(R+14)*Math.cos(a), ly=CY+(R+14)*Math.sin(a);
+        const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x',lx); t.setAttribute('y',ly+3.5);
+        t.setAttribute('text-anchor','middle');
+        t.setAttribute('font-family','IBM Plex Mono,monospace');
+        t.setAttribute('font-size','9'); t.setAttribute('fill','#505c72');
+        t.textContent=DOMAINS[i];
+        labs.appendChild(t);
+    });
+}
+
+function updateRadar(scores){
+    const pts=ANGLES.map((a,i)=>{
+        const s=scores[DOMAINS[i]]||0;
+        return `${CX+R*s*Math.cos(a)},${CY+R*s*Math.sin(a)}`;
+    });
+    document.getElementById('rFill').setAttribute('points',pts.join(' '));
+    const dg=document.getElementById('rDots'); dg.innerHTML='';
+    ANGLES.forEach((a,i)=>{
+        const s=scores[DOMAINS[i]]||0;
+        if(!s) return;
+        const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('cx',CX+R*s*Math.cos(a)); c.setAttribute('cy',CY+R*s*Math.sin(a));
+        c.setAttribute('r',3.5);
+        c.setAttribute('fill',s>.65?'#ef4444':s>.45?'#f59e0b':'#22c55e');
+        dg.appendChild(c);
+    });
+}
+
+// ═══════════════════════════════════════
+//  NODE / FLOW STATE
+// ═══════════════════════════════════════
+function nstate(id,s){ const n=document.getElementById('node-'+id); if(n) n.className.baseVal=`pnode s-${s}`; }
+function fstate(id,on){ const f=document.getElementById(id); if(f) f.classList.toggle('on',on); }
+
+// ═══════════════════════════════════════
+//  LOGGING
+// ═══════════════════════════════════════
+let t0=null;
+function ts(){
+    if(!t0) return '00:00.0';
+    const e=((Date.now()-t0)/1000).toFixed(1);
+    const m=Math.floor(e/60).toString().padStart(2,'0');
+    const s=(e%60).toFixed(1).padStart(4,'0');
+    return `${m}:${s}`;
+}
+function log(msg,type='info',tag='[SYS]'){
+    const el=document.getElementById('logScroll');
+    const d=document.createElement('div');
+    d.className=`le ${type}`;
+    d.innerHTML=`<span class="lt">${ts()}</span><span class="lk">${tag}</span><span class="lm">${msg}</span>`;
+    el.appendChild(d); el.scrollTop=el.scrollHeight;
+}
+
+// ═══════════════════════════════════════
+//  TIMER
+// ═══════════════════════════════════════
+let timerRef=null;
+function startTimer(){ t0=Date.now(); timerRef=setInterval(()=>{
+    const e=((Date.now()-t0)/1000).toFixed(1);
+    const m=Math.floor(e/60).toString().padStart(2,'0');
+    const s=(e%60).toFixed(1).padStart(4,'0');
+    document.getElementById('elapsedVal').textContent=`${m}:${s}`;
+},100);}
+function stopTimer(){ clearInterval(timerRef); }
+
+function orchState(s){
+    const b=document.getElementById('orchBadge');
+    b.className=`status-badge ${s}`;
+    b.textContent={idle:'IDLE',running:'RUNNING',waiting:'AWAITING HITL',complete:'COMPLETE'}[s]||s.toUpperCase();
+}
+
+// ═══════════════════════════════════════
+//  PIPELINE SIMULATION
+// ═══════════════════════════════════════
+let running=false;
+
+async function runPipeline(){
+    if(running) return;
+    const query = document.querySelector('.query-textarea').value.trim();
+    if(!query){ log('Please enter a query.','warn','[UI]'); return; }
+
+    running=true;
+    t0=null;
+    _tagsSeen.clear();
+    document.getElementById('runBtn').disabled=true;
+    document.getElementById('hitlBanner').classList.remove('show');
+    document.getElementById('rankScroll').innerHTML='<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-2);text-align:center;padding:10px 0">Running analysis...</div>';
+    document.getElementById('traceOut').textContent='—';
+
+    ['orchestrator','rag','router','si','mm','eh','hf','sysi','synthesis','validator','output'].forEach(n=>nstate(n,'idle'));
+    document.querySelectorAll('.fanim').forEach(f=>f.classList.remove('on'));
+    updateRadar({SI:0,MM:0,EH:0,HF:0,SysI:0});
+
+    startTimer();
+    orchState('running');
+    nstate('orchestrator','active');
+    document.getElementById('pipeMsg').innerHTML='Pipeline executing...';
+
+    // Start pipeline on server
+    const runResp = await fetch('/run',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({query, run_feedback:false})
+    });
+    if(!runResp.ok){
+        const err = await runResp.json();
+        log(err.error||'Failed to start pipeline','warn','[ERR]');
+        orchState('idle'); stopTimer(); running=false;
+        document.getElementById('runBtn').disabled=false;
+        return;
+    }
+
+    // Stream events
+    const evtSource = new EventSource('/stream');
+
+    evtSource.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        log(d.msg, d.type||'info', d.tag||'[SYS]');
+        updateNodeFromLog(d.tag||'');
+    };
+
+    evtSource.addEventListener('hitl', (e) => {
+        const d = JSON.parse(e.data);
+        stopTimer();
+        orchState('waiting');
+        nstate('validator','active');
+        document.getElementById('hitlBanner').classList.add('show');
+        document.getElementById('pipeMsg').innerHTML='<em>Awaiting expert validation...</em>';
+        log(d.summary||'Pipeline paused for expert review.','warn','[HITL]');
+        if(d.recommendation) log(`AI recommendation: ${d.recommendation.toUpperCase()}`,'info','[HITL]');
+    });
+
+    evtSource.addEventListener('result', (e) => {
+        evtSource.close();
+        const result = JSON.parse(e.data);
+        nstate('validator','done');
+        nstate('output','active');
+        fstate('fa-val-out',true);
+        setTimeout(()=>{ nstate('output','done'); fstate('fa-val-out',false); },400);
+        renderRankings(result);
+        renderTrace(result);
+        orchState('complete');
+        const elapsed=((Date.now()-t0)/1000).toFixed(1);
+        document.getElementById('pipeMsg').innerHTML=`Completed in <em>${elapsed}s</em>`;
+        running=false;
+        document.getElementById('runBtn').disabled=false;
+    });
+
+    evtSource.addEventListener('error', (e) => {
+        evtSource.close();
+        try{
+            const d = JSON.parse(e.data);
+            log(d.message||'Pipeline error','warn','[ERR]');
+        }catch(_){ log('Pipeline error','warn','[ERR]'); }
+        orchState('idle'); stopTimer(); running=false;
+        document.getElementById('runBtn').disabled=false;
+    });
+
+    evtSource.onerror = () => {
+        if(!running) return;
+        evtSource.close();
+        log('Connection to server lost','warn','[ERR]');
+        orchState('idle'); stopTimer(); running=false;
+        document.getElementById('runBtn').disabled=false;
+    };
+}
+
+function hitl(action){
+    document.getElementById('hitlBanner').classList.remove('show');
+    const msgs={
+        approve:['Expert approved. Resuming pipeline...','ok','[HITL]'],
+        reject: ['Expert rejected. Pipeline will halt.','warn','[HITL]'],
+        modify: ['Modification requested. Resuming...','warn','[HITL]'],
+        skip:   ['Validation skipped. Resuming pipeline...','info','[HITL]']
+    };
+    const [m,t,k]=msgs[action]||['Decision sent.','info','[HITL]'];
+    log(m,t,k);
+    startTimer();
+    orchState('running');
+    fetch('/hitl',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({decision:action, note:''})
+    });
+}
+
+// ═══════════════════════════════════════
+//  RANKINGS
+// ═══════════════════════════════════════
+function renderRankings(result){
+    const rankings=(result.risk_rankings||[]);
+    const el=document.getElementById('rankScroll');
+    el.innerHTML='';
+    // Update radar from real scores
+    const radarScores={};
+    rankings.forEach(item=>{ radarScores[item.domain_id]=item.risk_score; });
+    updateRadar(radarScores);
+    // Render each row
+    rankings.forEach((item,i)=>{
+        const sc=item.risk_score>.65?'hi':item.risk_score>.45?'med':'lo';
+        const label=item.risk_score>.65?'HIGH':item.risk_score>.45?'MEDIUM':'LOW';
+        const bel=item.high_belief||0;
+        const div=document.createElement('div');
+        div.className='ritem';
+        div.innerHTML=`
+            <div class="ritem-head">
+                <span class="rdom">${item.domain_name}</span>
+                <span class="rscore ${sc}">${(item.risk_score*100).toFixed(0)}%</span>
+            </div>
+            <div class="rbar-bg"><div class="rbar-fill ${sc}" style="width:0" data-w="${(item.risk_score*100).toFixed(0)}%"></div></div>
+            <div class="rbel">Bel·High: ${(bel*100).toFixed(0)}% · ${label}</div>`;
+        el.appendChild(div);
+        setTimeout(()=>{
+            div.classList.add('in');
+            div.querySelector('.rbar-fill').style.width=div.querySelector('.rbar-fill').dataset.w;
+        },i*110+40);
+    });
+}
+
+function renderTrace(result){
+    const skillResults=(result.traceability||{}).skill_results||[];
+    const skillTrace=result.skill_trace||{};
+    const lines=skillResults.map(sr=>`<div class="th">${sr.domain_id}: ${(sr.activated_templates||[]).length} rules fired · score=${sr.risk_score.toFixed(2)}</div>`).join('');
+    const routing=skillTrace.routing_decision||{};
+    const validation=(skillTrace.expert_validation||'not_validated').toUpperCase();
+    document.getElementById('traceOut').innerHTML=
+        lines+`<div>Expert: ${validation}${skillTrace.expert_note?' — '+skillTrace.expert_note:''}</div>`;
+}
+
+// ═══════════════════════════════════════
+//  SKILLS DRAWER
+// ═══════════════════════════════════════
+function toggleDrawer(){
+    const d=document.getElementById('drawer');
+    d.classList.toggle('open');
+    if(d.classList.contains('open')&&!document.getElementById('drawerScroll').children.length) renderDrawer();
+}
+function renderDrawer(){
+    const el=document.getElementById('drawerScroll');
+    el.innerHTML='';
+    SKILLS_META.forEach(sk=>{
+        const c=document.createElement('div');
+        c.className='skill-card';
+        c.innerHTML=`
+            <div class="sk-head">
+                <div class="sk-name">${sk.file}</div>
+                <div class="sk-ver">v${sk.ver}</div>
+            </div>
+            <div class="sk-conf-row">
+                <span class="sk-conf-label">routing_confidence</span>
+                <span class="sk-conf-val">${sk.conf.toFixed(2)}</span>
+            </div>
+            <div class="sk-bar-bg"><div class="sk-bar-fill" style="width:${sk.conf*100}%"></div></div>
+            <div class="sk-meta">${sk.tpl} inference templates · domain: ${sk.id}</div>`;
+        el.appendChild(c);
+    });
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+initRadar();
+updateRadar({SI:0,MM:0,EH:0,HF:0,SysI:0});
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "domain_id": "SI",
+  "domain_name": "Structural Integrity",
+  "version": "1.0",
+  "hazard_keywords": ["propeller", "blade", "fatigue", "corrosion", "mechanical wear", "thruster", "bearing", "seal", "vibration"],
+  "linguistic_variables": {
+    "corrosion_rate":        {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "fatigue_level":         {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "inspection_frequency":  {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]},
+    "risk_score":            {"low": [0.0, 0.0, 0.4], "medium": [0.2, 0.5, 0.8], "high": [0.6, 1.0, 1.0]}
+  },
+  "inference_templates": [
+    {"id": "T_SI_1", "conditions": {"corrosion_rate": "high", "fatigue_level": "high"},  "output": "high",   "weight": 0.90},
+    {"id": "T_SI_2", "conditions": {"corrosion_rate": "high", "fatigue_level": "medium"},"output": "high",   "weight": 0.80},
+    {"id": "T_SI_3", "conditions": {"corrosion_rate": "medium","fatigue_level": "high"}, "output": "medium", "weight": 0.75},
+    {"id": "T_SI_4", "conditions": {"corrosion_rate": "low",   "inspection_frequency": "low"}, "output": "medium", "weight": 0.65},
+    {"id": "T_SI_5", "conditions": {"corrosion_rate": "low",   "fatigue_level": "low"},  "output": "low",    "weight": 0.85}
+  ],
+  "routing_confidence": 0.92,
+  "benchmark": {
+    "expert_agreement_rate": 0.92,
+    "mean_deviation": 0.08,
+    "version": 1,
+    "approval_date": "2024-01-15"
+  }
+}
