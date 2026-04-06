@@ -36,6 +36,7 @@ def run():
     data = request.get_json(force=True) or {}
     query = (data.get("query") or "").strip()
     run_feedback = bool(data.get("run_feedback", False))
+    forced_skills = data.get("forced_skills") or None  # list of domain IDs or None
 
     if not query:
         return jsonify({"error": "Query is required"}), 400
@@ -50,7 +51,8 @@ def run():
     def _run():
         global _pipeline_running, _pipeline_result, _pipeline_error
         try:
-            result = run_pipeline(query, run_feedback=run_feedback)
+            result = run_pipeline(query, run_feedback=run_feedback,
+                                  forced_skills=forced_skills)
             _pipeline_result = result
         except Exception as exc:
             _pipeline_error = str(exc)
@@ -84,6 +86,18 @@ def stream():
                     yield f"data: {data}\n\n"
 
             if _pipeline_result is not None:
+                # Drain any remaining queued messages before sending result
+                while True:
+                    try:
+                        remaining = q.get_nowait()
+                        if not remaining.startswith("__HITL__:"):
+                            m = _TAG_RE.match(remaining)
+                            tag = f"[{m.group(1)}]" if m else "[SYS]"
+                            msg_type = "ok" if "→" in remaining else "info"
+                            data = json.dumps({"msg": remaining, "tag": tag, "type": msg_type})
+                            yield f"data: {data}\n\n"
+                    except Exception:
+                        break
                 payload = json.dumps(_pipeline_result, cls=_SafeEncoder)
                 yield f"event: result\ndata: {payload}\n\n"
                 break

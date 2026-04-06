@@ -83,6 +83,10 @@
             display: block; font-family: var(--font-mono); font-size: 9px;
             letter-spacing: 4px; color: var(--text-2); margin-top: 1px;
         }
+        .logo .logo-author {
+            font-size: 8px; letter-spacing: 2px; color: var(--amber); opacity: 0.7;
+            margin-top: 2px;
+        }
 
         .hdiv { width: 1px; height: 26px; background: var(--border-bright); flex-shrink: 0; }
 
@@ -328,7 +332,7 @@
 
     <!-- ═══════════════════ HEADER ═══════════════════ -->
     <header>
-        <div class="logo">FPSO·RA<span>MULTI-AGENT RISK ANALYZER</span></div>
+        <div class="logo">FPSO·RA<span>MULTI-AGENT RISK ANALYZER</span><span class="logo-author">Developed by Prof. J Ren</span></div>
         <div class="hdiv"></div>
         <div class="orch-status">
             <span class="status-label">ORCHESTRATOR</span>
@@ -712,13 +716,18 @@ function log(msg,type='info',tag='[SYS]'){
 //  TIMER
 // ═══════════════════════════════════════
 let timerRef=null;
-function startTimer(){ t0=Date.now(); timerRef=setInterval(()=>{
-    const e=((Date.now()-t0)/1000).toFixed(1);
-    const m=Math.floor(e/60).toString().padStart(2,'0');
-    const s=(e%60).toFixed(1).padStart(4,'0');
-    document.getElementById('elapsedVal').textContent=`${m}:${s}`;
-},100);}
-function stopTimer(){ clearInterval(timerRef); }
+let _pausedMs=0;  // accumulates elapsed time across HITL pauses
+function startTimer(reset=false){
+    if(reset){ _pausedMs=0; }
+    t0=Date.now()-_pausedMs;
+    timerRef=setInterval(()=>{
+        const e=((Date.now()-t0)/1000).toFixed(1);
+        const m=Math.floor(e/60).toString().padStart(2,'0');
+        const s=(e%60).toFixed(1).padStart(4,'0');
+        document.getElementById('elapsedVal').textContent=`${m}:${s}`;
+    },100);
+}
+function stopTimer(){ clearInterval(timerRef); _pausedMs=Date.now()-t0; }
 
 function orchState(s){
     const b=document.getElementById('orchBadge');
@@ -748,16 +757,21 @@ async function runPipeline(){
     document.querySelectorAll('.fanim').forEach(f=>f.classList.remove('on'));
     updateRadar({SI:0,MM:0,EH:0,HF:0,SysI:0});
 
-    startTimer();
+    startTimer(true);
     orchState('running');
     nstate('orchestrator','active');
     document.getElementById('pipeMsg').innerHTML='Pipeline executing...';
+
+    // Read selected domain chips (chip with class 'on' = selected)
+    const forcedSkills = [...document.querySelectorAll('.domain-chips .chip.on')]
+        .map(c => c.textContent.trim());
 
     // Start pipeline on server
     const runResp = await fetch('/run',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({query, run_feedback:false})
+        body: JSON.stringify({query, run_feedback:false,
+            forced_skills: forcedSkills.length > 0 ? forcedSkills : null})
     });
     if(!runResp.ok){
         const err = await runResp.json();
@@ -790,6 +804,9 @@ async function runPipeline(){
     evtSource.addEventListener('result', (e) => {
         evtSource.close();
         const result = JSON.parse(e.data);
+        // Reconcile skill node states with which agents actually ran
+        const activeDomains = new Set((result.risk_rankings||[]).map(r => r.domain_id.toLowerCase()));
+        ['si','mm','eh','hf','sysi'].forEach(n => nstate(n, activeDomains.has(n) ? 'done' : 'idle'));
         nstate('validator','done');
         nstate('output','active');
         fstate('fa-val-out',true);
@@ -832,7 +849,7 @@ function hitl(action){
     };
     const [m,t,k]=msgs[action]||['Decision sent.','info','[HITL]'];
     log(m,t,k);
-    startTimer();
+    startTimer();  // resumes from _pausedMs, no reset
     orchState('running');
     fetch('/hitl',{
         method:'POST',

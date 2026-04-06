@@ -28,3 +28,23 @@ Thumbs.db
 *.png
 *.jpg
 paper_full.txt
+
+# Paper and writing process scripts
+generate_paper.py
+generate_figures.py
+read_manuscript.py
+read_sections.py
+read_skills.py
+
+# Internal planning notes
+docs/plans/
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# pytest cache
+.pytest_cache/
+
+# Word lock files
+~$*

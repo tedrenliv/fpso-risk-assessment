@@ -46,18 +46,21 @@ def run_skill_agent(domain_id: str, evidence: dict) -> SkillResult:
     for var_name, terms_config in skill.linguistic_variables.items():
         if var_name == "risk_score":
             continue
+        from core.fuzzy_engine import TFN
+        terms = {t: TFN(*vals) for t, vals in terms_config.items()}
         if var_name in linguistic_assignments:
             # Convert linguistic assignment to membership (assigned term gets full membership)
             assigned_term = linguistic_assignments[var_name]
-            from core.fuzzy_engine import TFN
-            terms = {t: TFN(*vals) for t, vals in terms_config.items()}
             memberships = {t: 0.0 for t in terms}
             if assigned_term in memberships:
                 memberships[assigned_term] = 1.0
             else:
-                # Partial: all medium
-                memberships = {t: (1.0 if t == "medium" else 0.0) for t in terms}
-            input_memberships[var_name] = memberships
+                # Unknown term — uniform uncertainty
+                memberships = {t: 1.0 / len(terms) for t in terms}
+        else:
+            # No evidence for this variable — uniform uncertainty so rules can partially fire
+            memberships = {t: 1.0 / len(terms) for t in terms}
+        input_memberships[var_name] = memberships
 
     # Step 2: Mamdani fuzzy inference
     from core.fuzzy_engine import TFN

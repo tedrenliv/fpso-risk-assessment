@@ -14,10 +14,14 @@ async def _run_skill_agent_async(domain_id: str, evidence: dict) -> SkillResult:
     return await loop.run_in_executor(None, run_skill_agent, domain_id, evidence)
 
 
+_CHIP_TO_DOMAIN = {"SI": "SI", "MM": "MM", "EH": "EH", "HF": "HF", "SYSI": "SysI"}
+
+
 async def run_pipeline_async(
     query: str,
     expert_ground_truth: Dict[str, Dict[str, float]] = None,
     run_feedback: bool = False,
+    forced_skills: list = None,
 ) -> Dict[str, Any]:
     """
     Full async pipeline: L1 → L2 → L3 → L4 (parallel) → L5 → Validator → L6.
@@ -31,13 +35,19 @@ async def run_pipeline_async(
     print("[L2] Running Skill-Aware RAG Agent...")
     evidence = run_rag_agent(query)
 
-    # L3: Skill Router
+    # L3: Skill Router (or forced override from UI)
     print("[L3] Running Skill Router...")
-    routing = route_skills(query, evidence)
-    primary = routing["primary_skill"]
-    secondary = routing.get("secondary_skills", [])
-    active_skills = list({primary} | set(secondary))
-    print(f"  → Activated Skills: {active_skills} (confidence: {routing['confidence']:.2f})")
+    if forced_skills:
+        active_skills = [_CHIP_TO_DOMAIN.get(s.upper(), s) for s in forced_skills]
+        routing = {"primary_skill": active_skills[0], "secondary_skills": active_skills[1:],
+                   "confidence": 1.0, "forced": True}
+        print(f"  → Forced Skills: {active_skills} (user-selected)")
+    else:
+        routing = route_skills(query, evidence)
+        primary = routing["primary_skill"]
+        secondary = routing.get("secondary_skills", [])
+        active_skills = list({primary} | set(secondary))
+        print(f"  → Activated Skills: {active_skills} (confidence: {routing['confidence']:.2f})")
 
     # L4: Parallel Skill Agents
     print(f"[L4] Running {len(active_skills)} Skill Agent(s) in parallel...")
@@ -70,6 +80,7 @@ def run_pipeline(
     query: str,
     expert_ground_truth: Dict = None,
     run_feedback: bool = False,
+    forced_skills: list = None,
 ) -> Dict[str, Any]:
     """Synchronous wrapper for the async pipeline."""
-    return asyncio.run(run_pipeline_async(query, expert_ground_truth, run_feedback))
+    return asyncio.run(run_pipeline_async(query, expert_ground_truth, run_feedback, forced_skills))

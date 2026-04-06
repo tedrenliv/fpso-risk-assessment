@@ -6,10 +6,24 @@ from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-SYSTEM_PROMPT = """You are an Expert Validation Agent for an offshore risk analysis system.
-Generate a concise validation report for the human expert to review.
-Highlight: (1) high-uncertainty findings (wide belief-plausibility intervals), (2) dominant risk factors, (3) any reasoning inconsistencies.
-Return JSON with keys: validation_summary (string), flags (list of strings), recommendation (approve/review/reject), confidence_note (string)."""
+SYSTEM_PROMPT = """You are an Expert Validation Agent for an offshore FPSO risk analysis system.
+Your job is to validate that the risk output is contextually reasonable given the query.
+
+IMPORTANT — system design facts you must know:
+- Belief intervals are ALWAYS zero-width (Bel == Pl) in this system. This is mathematically correct for atomic BPA hypotheses. Do NOT flag this as an anomaly or uncertainty.
+- Risk scores range 0–1 (defuzzified fuzzy output). Scores 0.3–0.7 are normal for moderate queries.
+- Domains: SI (Structural Integrity), MM (Maintenance Management), EH (Environmental Hazard), HF (Human Factors), SysI (System Integration).
+
+Decision criteria — choose ONE:
+- "approve": The dominant risk factor and score ordering are plausible given the query context. Minor imprecision is acceptable.
+- "review": There is a genuine domain-relevance concern (e.g. storm query but EH ranked last), weak or ambiguous evidence, or moderate expert uncertainty.
+- "reject": Output is nonsensical — dominant factor flatly contradicts query evidence, all scores identical despite varied query, or model appears non-functional.
+
+Return ONLY valid JSON with keys:
+- validation_summary (string): 1-2 sentences on whether ranking matches query context
+- flags (list of strings): only real domain concerns, NOT zero-width intervals
+- recommendation (string): exactly one of "approve", "review", "reject"
+- confidence_note (string): brief note on evidence strength"""
 
 
 def run_validator(synthesis_output: Dict[str, Any], query: str) -> Dict[str, Any]:

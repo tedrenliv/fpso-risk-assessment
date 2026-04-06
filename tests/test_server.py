@@ -36,7 +36,7 @@ def test_run_rejects_concurrent(client):
 def test_run_starts_pipeline(client, monkeypatch):
     started = []
 
-    def fake_pipeline(query, run_feedback=False):
+    def fake_pipeline(query, run_feedback=False, forced_skills=None):
         started.append(query)
         return {"risk_rankings": [], "risk_profile": {}, "traceability": {}, "skill_trace": {}}
 
