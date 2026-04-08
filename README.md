@@ -1,6 +1,6 @@
 # Multi-Agent Skill-Enhanced RAG Risk Analysis System
 
-**Code availability:** This repository accompanies a paper submitted to the Journal of Offshore Mechanics and Arctic Engineering. The codebase is under review; a permanent DOI will be added upon acceptance.
+**Code availability:** This repository accompanies a paper submitted to the Journal of Information and Sofrware Technology. A permanent DOI will be added upon acceptance.
 
 A 9-agent Python system for FPSO (Floating Production, Storage and Offloading) vessel risk analysis. Combines a ChromaDB vector knowledge base, Mamdani fuzzy inference, and Dempster-Shafer uncertainty fusion to produce ranked risk assessments across five offshore engineering domains.
 
